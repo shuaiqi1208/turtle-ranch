@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M78陆龟养成 - MVP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(180deg, #87CEEB 0%, #E8F5E9 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .container { max-width: 400px; margin: 0 auto; }
+        
+        /* 状态栏 */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .stat-box {
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-value { font-size: 20px; font-weight: bold; color: #2E7D32; }
+        .stat-label { font-size: 12px; color: #666; }
+        
+        /* 龟龟区域 */
+        .turtle-area {
+            background: linear-gradient(180deg, #81C784 0%, #4CAF50 100%);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .turtle {
+            font-size: 100px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .turtle:active { transform: scale(1.1); }
+        .level-badge {
+            background: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        /* 成长进度 */
+        .growth-bar {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FF9800, #FFC107);
+            transition: width 0.3s;
+        }
+        
+        /* 操作按钮 */
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .btn {
+            background: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:active { background: #f0f0f0; }
+        
+        /* 菜园 */
+        .garden {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        .garden-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .plot {
+            aspect-ratio: 1;
+            background: #8D6E63;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            cursor: pointer;
+        }
+        .plot.planted { background: #66BB6A; }
+        .plot.ready { background: #FFB74D; }
+        
+        /* 背包 */
+        .inventory {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+        }
+        .item {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #f5f5f5;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .count {
+            background: #4CAF50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 状态 -->
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-value" id="hunger">80</div>
+                <div class="stat-label">饱食度</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="level">1</div>
+                <div class="stat-label">等级</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="growth">0</div>
+                <div class="stat-label">成长值</div>
+            </div>
+        </div>
+        
+        <!-- 龟龟 -->
+        <div class="turtle-area">
+            <div class="turtle" onclick="pet()">🐢</div>
+            <div class="level-badge">Lv.<span id="levelBadge">1</span></div>
+        </div>
+        
+        <!-- 成长进度 -->
+        <div class="growth-bar">
+            <div>成长进度：<span id="growthText">0/100</span></div>
+            <div class="progress">
+                <div class="progress-fill" id="progressFill" style="width:0%"></div>
+            </div>
+        </div>
+        
+        <!-- 操作 -->
+        <div class="actions">
+            <button class="btn" onclick="showGarden()">🌱 菜园</button>
+            <button class="btn" onclick="showInventory()">🎒 背包</button>
+            <button class="btn" onclick="clean()">🚿 清洁</button>
+        </div>
+        
+        <!-- 菜园 -->
+        <div class="garden" id="gardenSection">
+            <div style="margin-bottom:10px;font-weight:bold;">🌱 点击种菜/收获</div>
+            <div class="garden-grid" id="garden"></div>
+        </div>
+        
+        <!-- 背包 -->
+        <div class="inventory" id="inventorySection" style="display:none">
+            <div style="margin-bottom:10px;font-weight:bold;">🎒 点击喂食</div>
+            <div id="inventory"></div>
+        </div>
+    </div>
+
+    <script>
+        // 游戏数据 - 自动从localStorage读取
+        let game = JSON.parse(localStorage.getItem('turtleGame')) || {
+            hunger: 80,
+            level: 1,
+            growth: 0,
+            maxGrowth: 100,
+            inventory: { lettuce: 0, carrot: 0, tomato: 0 },
+            garden: Array(9).fill(null)
+        };
+        
+        const foods = {
+            lettuce: { icon: '🥬', name: '生菜', value: 15, growth: 10 },
+            carrot: { icon: '🥕', name: '胡萝卜', value: 25, growth: 15 },
+            tomato: { icon: '🍅', name: '西红柿', value: 35, growth: 20 }
+        };
+        
+        // 保存游戏
+        function save() {
+            localStorage.setItem('turtleGame', JSON.stringify(game));
+            updateUI();
+        }
+        
+        // 初始化菜园
+        function initGarden() {
+            const grid = document.getElementById('garden');
+            grid.innerHTML = '';
+            game.garden.forEach((plot, i) => {
+                const div = document.createElement('div');
+                div.className = 'plot';
+                div.onclick = () => clickPlot(i);
+                
+                if (!plot) {
+                    div.textContent = '🌱';
+                } else if (plot.ready) {
+                    div.className = 'plot ready';
+                    div.textContent = foods[plot.type].icon;
+                } else {
+                    div.className = 'plot planted';
+                    div.textContent = '⏳';
+                }
+                
+                grid.appendChild(div);
+            });
+        }
+        
+        // 点击菜地
+        function clickPlot(index) {
+            const plot = game.garden[index];
+            
+            if (!plot) {
+                // 种菜
+                const types = Object.keys(foods);
+                const type = types[Math.floor(Math.random() * types.length)];
+                game.garden[index] = {
+                    type: type,
+                    plantTime: Date.now(),
+                    ready: false
+                };
+                setTimeout(() => {
+                    game.garden[index].ready = true;
+                    save();
+                    initGarden();
+                }, 5000); // 5秒成熟
+            } else if (plot.ready) {
+                // 收获
+                game.inventory[plot.type]++;
+                game.garden[index] = null;
+            }
+            
+            save();
+            initGarden();
+        }
+        
+        // 显示菜园
+        function showGarden() {
+            document.getElementById('gardenSection').style.display = 'block';
+            document.getElementById('inventorySection').style.display = 'none';
+            initGarden();
+        }
+        
+        // 显示背包
+        function showInventory() {
+            document.getElementById('gardenSection').style.display = 'none';
+            document.getElementById('inventorySection').style.display = 'block';
+            
+            const inv = document.getElementById('inventory');
+            inv.innerHTML = '';
+            
+            Object.entries(game.inventory).forEach(([type, count]) => {
+                if (count > 0) {
+                    const item = document.createElement('div');
+                    item.className = 'item';
+                    item.onclick = () => feed(type);
+                    item.innerHTML = `
+                        <span>${foods[type].icon} ${foods[type].name}</span>
+                        <span class="count">${count}</span>
+                    `;
+                    inv.appendChild(item);
+                }
+            });
+            
+            if (inv.innerHTML === '') {
+                inv.innerHTML = '<div style="color:#999">背包为空，去菜园种菜吧！</div>';
+            }
+        }
+        
+        // 喂食
+        function feed(type) {
+            if (game.inventory[type] <= 0) return;
+            
+            game.inventory[type]--;
+            game.hunger = Math.min(100, game.hunger + foods[type].value);
+            game.growth = Math.min(game.maxGrowth, game.growth + foods[type].growth);
+            
+            // 升级检查
+            if (game.growth >= game.maxGrowth) {
+                game.level++;
+                game.growth = 0;
+                game.maxGrowth = game.level * 100;
+                alert(`🎉 恭喜！龟龟升到了 Lv.${game.level}！`);
+            }
+            
+            save();
+            showInventory();
+        }
+        
+        // 清洁
+        function clean() {
+            alert('🚿 龟龟变干净了！（MVP版功能）');
+        }
+        
+        // 抚摸
+        function pet() {
+            game.hunger = Math.max(0, game.hunger - 5);
+            save();
+        }
+        
+        // 自然消耗
+        setInterval(() => {
+            game.hunger = Math.max(0, game.hunger - 2);
+            save();
+        }, 10000);
+        
+        // 更新UI
+        function updateUI() {
+            document.getElementById('hunger').textContent = Math.floor(game.hunger);
+            document.getElementById('level').textContent = game.level;
+            document.getElementById('growth').textContent = Math.floor(game.growth);
+            document.getElementById('levelBadge').textContent = game.level;
+            document.getElementById('growthText').textContent = `${Math.floor(game.growth)}/${game.maxGrowth}`;
+            document.getElementById('progressFill').style.width = (game.growth / game.maxGrowth * 100) + '%';
+        }
+        
+        // 初始化
+        showGarden();
+        updateUI();
+    </script>
+</body>
+</html>
